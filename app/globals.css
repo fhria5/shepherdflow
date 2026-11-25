@@ -2,23 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/* Base — "Buletin gereja yang tenang"                                */
+/* Body text is serif (Newsreader), 17px, line-height 1.65.           */
+/* Small labels and buttons use Inter (font-sans).                    */
+/* ------------------------------------------------------------------ */
+
 html {
   -webkit-text-size-adjust: 100%;
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.65;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus: 3px high-contrast ring everywhere. */
+:focus-visible {
+  outline: 3px solid #3f5b3a;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: #a9c79f;
+  }
+}
+
+/* Sermon Trace highlight: colour AND an underline, never colour alone. */
 mark {
-  background-color: #fde68a;
+  background-color: #f6e7a8;
   color: inherit;
   border-radius: 2px;
-  padding: 0 1px;
+  padding: 0 2px;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  mark {
+    background-color: #6b5a1f;
+  }
 }
 
 textarea,
 input,
 select {
-  font-size: 16px;
+  font-size: 1rem;
+}
+
+/* Skip link — visible only when focused. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: #3f5b3a;
+  color: #fff;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  top: 1rem;
+  outline-color: #fff;
+}
+
+/* Bottom sheet (transcript / Sermon Trace). */
+.sheet-panel {
+  transition: transform 0.2s ease;
+}
+
+@layer components {
+  /* Card: 12px corners, thin border, no heavy shadow. */
+  .card {
+    @apply rounded-xl border border-bulletin-line bg-bulletin-card dark:border-bulletin-lineDark dark:bg-bulletin-cardDark;
+  }
+
+  /* Small-caps eyebrow label (Inter). */
+  .eyebrow {
+    @apply font-sans text-xs font-semibold uppercase tracking-[0.08em] text-bulletin-muted dark:text-bulletin-mutedDark;
+  }
+
+  /* Visible form label (Inter). */
+  .field-label {
+    @apply mb-1 block font-sans text-sm font-semibold text-bulletin-ink dark:text-bulletin-inkDark;
+  }
+
+  .field-hint {
+    @apply mt-1 font-sans text-xs leading-relaxed text-bulletin-muted dark:text-bulletin-mutedDark;
+  }
+
+  /* Text field: 44px minimum height, 1px border, clear focus via global ring. */
+  .field {
+    @apply w-full rounded-xl border border-bulletin-line bg-bulletin-card px-3 py-2.5 text-bulletin-ink placeholder:text-bulletin-muted/70 focus:border-bulletin-olive focus:outline-none dark:border-bulletin-lineDark dark:bg-bulletin-cardDark dark:text-bulletin-inkDark dark:placeholder:text-bulletin-mutedDark/70 dark:focus:border-bulletin-oliveLight;
+  }
+
+  /* Buttons — minimum touch target 44x44px, 8px gaps via gap-2 on parents. */
+  .btn {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-sans text-sm font-semibold transition-colors focus:outline-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-bulletin-olive text-white hover:bg-bulletin-oliveDeep dark:bg-bulletin-oliveLight dark:text-bulletin-bgDark dark:hover:bg-[#bcd8b2];
+  }
+
+  .btn-secondary {
+    @apply btn border border-bulletin-olive bg-bulletin-card text-bulletin-olive hover:bg-bulletin-badgeTint dark:border-bulletin-oliveLight dark:bg-transparent dark:text-bulletin-oliveLight dark:hover:bg-bulletin-badgeTintDark;
+  }
+
+  .btn-ghost {
+    @apply btn border border-bulletin-line bg-bulletin-card text-bulletin-ink hover:bg-bulletin-bg dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-inkDark dark:hover:bg-bulletin-cardDark;
+  }
+
+  .btn-small {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-sans text-sm font-medium transition-colors focus:outline-none;
+  }
+
+  /* Safe-area padding for sticky bottom bars (gesture area). */
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
 }

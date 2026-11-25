@@ -17,6 +17,61 @@ interface Props {
   onDownloadPdf: (sections: "care" | "all") => void;
 }
 
+function SendIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function WarnIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3 2.5 20h19L12 3z" />
+      <path d="M12 10v4" />
+      <path d="M12 17.5h.01" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.5h.01" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
+    </svg>
+  );
+}
+
 export default function CareScreen(p: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -42,149 +97,221 @@ export default function CareScreen(p: Props) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const personLabel = (verb: "approve" | "edit" | "copy", initials: string) => {
+    if (p.uiLang === "id") {
+      if (verb === "approve") return `Setujui pesan untuk ${initials}`;
+      if (verb === "edit") return `Edit pesan untuk ${initials}`;
+      return `Salin pesan untuk ${initials}`;
+    }
+    if (verb === "approve") return `Approve message for ${initials}`;
+    if (verb === "edit") return `Edit message for ${initials}`;
+    return `Copy message for ${initials}`;
+  };
+
+  const visitCalm =
+    p.uiLang === "id"
+      ? "Orang ini butuh sentuhan pribadi. Telepon atau kunjungi langsung."
+      : "This person needs a personal touch. Call or visit in person.";
+  const visitNote =
+    p.uiLang === "id"
+      ? "Tidak ada draf pesan AI untuk orang ini."
+      : "No AI message draft for this person.";
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-live="polite">
       {p.result.demoMode && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{p.t.demoBanner}</div>
+        <div className="card flex items-start gap-2 p-3 font-sans text-sm text-bulletin-muted dark:text-bulletin-mutedDark">
+          <span className="mt-0.5 shrink-0 text-bulletin-olive dark:text-bulletin-oliveLight">
+            <InfoIcon />
+          </span>
+          {p.t.demoBanner}
+        </div>
       )}
-      <div className="rounded-xl border border-stone-200 bg-white p-3 text-center text-xs font-semibold tracking-wide text-stone-500">
+      <p className="card flex items-center gap-2 p-3 font-sans text-xs font-semibold tracking-wide text-bulletin-muted dark:text-bulletin-mutedDark">
+        <span className="text-bulletin-olive dark:text-bulletin-oliveLight">
+          <InfoIcon />
+        </span>
         {p.t.aiDraftLabel}
-      </div>
+      </p>
 
-      <h2 className="font-serif text-xl font-bold text-stone-900">{p.t.careTitle}</h2>
+      <h2 className="font-serif text-2xl font-semibold">{p.t.careTitle}</h2>
 
-      {p.care.map((c) => (
-        <div key={c.initials} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <span className="text-lg font-bold text-stone-900">{c.initials}</span>
-              <span className="ml-2 text-sm text-stone-500">{CATEGORY_LABELS[c.category][p.uiLang]}</span>
-            </div>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                c.action === "visit" ? "bg-orange-100 text-orange-800" : "bg-green-100 text-green-800"
-              }`}
-            >
-              {c.action === "visit" ? p.t.visit : p.t.sendMessage}
-            </span>
-          </div>
-
-          {c.crisis && (
-            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm font-medium text-red-700">
-              ⚠ {p.t.crisisWarning}
-            </div>
-          )}
-
-          <p className="mt-2 text-sm leading-relaxed text-stone-700">
-            <span className="font-semibold">{p.t.suggestion}: </span>
-            {c.suggestion}
-          </p>
-
-          {c.action === "message" && c.draft && (
-            <div className="mt-3 rounded-lg bg-shepherd-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">{p.t.draft}</p>
-              {editingId === c.initials ? (
-                <>
-                  <textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    rows={4}
-                    className="mt-1.5 w-full rounded-lg border border-stone-300 bg-white p-2 text-[15px] leading-relaxed focus:border-shepherd-500 focus:outline-none"
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        update(c.initials, { draft: editText, draftEdited: true, draftApproved: false });
-                        setEditingId(null);
-                      }}
-                      className="rounded-lg bg-shepherd-600 px-3 py-1.5 text-sm font-semibold text-white"
-                    >
-                      {p.t.saveEdit}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(null)}
-                      className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-600"
-                    >
-                      {p.t.cancel}
-                    </button>
-                  </div>
-                </>
+      <ul className="space-y-4">
+        {p.care.map((c) => (
+          <li
+            key={c.initials}
+            aria-labelledby={`person-${c.initials}`}
+            className={`card p-4 ${c.action === "visit" ? "border-l-4 border-l-bulletin-brick dark:border-l-bulletin-brickLight" : ""}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 id={`person-${c.initials}`} className="font-serif text-lg font-semibold">
+                {c.initials}
+                <span className="ml-2 font-sans text-sm font-normal text-bulletin-muted dark:text-bulletin-mutedDark">
+                  {CATEGORY_LABELS[c.category][p.uiLang]}
+                </span>
+              </h3>
+              {c.action === "visit" ? (
+                <span className="inline-flex min-h-[2rem] items-center gap-1.5 rounded-full border border-bulletin-brick bg-bulletin-brickSoft px-2.5 py-1 font-sans text-xs font-semibold text-bulletin-brick dark:border-bulletin-brickLight dark:bg-bulletin-brickSoftDark dark:text-bulletin-brickLight">
+                  <PhoneIcon />
+                  {p.t.visit}
+                </span>
               ) : (
-                <>
-                  <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800">{c.draft}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(c.initials);
-                        setEditText(c.draft || "");
-                      }}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700"
-                    >
-                      {p.t.edit}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => update(c.initials, { draftApproved: true })}
-                      disabled={c.draftApproved}
-                      className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                        c.draftApproved ? "bg-green-100 text-green-800" : "bg-green-600 text-white hover:bg-green-700"
-                      }`}
-                    >
-                      {c.draftApproved ? `✓ ${p.t.approved}` : p.t.approve}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => copyDraft(c)}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700"
-                    >
-                      {copiedId === c.initials ? `✓ ${p.t.copied}` : p.t.copy}
-                    </button>
-                    {!c.draftApproved && (
-                      <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-800">
-                        {p.t.notApproved}
-                      </span>
-                    )}
-                  </div>
-                </>
+                <span className="inline-flex min-h-[2rem] items-center gap-1.5 rounded-full bg-bulletin-badgeTint px-2.5 py-1 font-sans text-xs font-semibold text-bulletin-oliveDeep dark:bg-bulletin-badgeTintDark dark:text-bulletin-oliveLight">
+                  <SendIcon />
+                  {p.t.sendMessage}
+                </span>
               )}
             </div>
-          )}
-          {c.action === "visit" && (
-            <p className="mt-2 text-xs italic text-stone-500">
-              {p.uiLang === "id"
-                ? "Tidak ada draf pesan AI untuk orang ini — hubungi langsung."
-                : "No AI message draft for this person — contact them in person."}
-            </p>
-          )}
-        </div>
-      ))}
 
-      <label className="flex items-start gap-2 rounded-xl border border-stone-200 bg-white p-3 text-sm shadow-sm">
+            {c.crisis && (
+              <p className="mt-3 flex items-start gap-2 rounded-lg border border-bulletin-brick/40 bg-bulletin-brickSoft p-3 font-sans text-sm font-medium text-bulletin-brick dark:bg-bulletin-brickSoftDark dark:text-bulletin-brickLight">
+                <span className="mt-0.5 shrink-0">
+                  <WarnIcon />
+                </span>
+                {p.t.crisisWarning}
+              </p>
+            )}
+
+            <p className="mt-3 text-sm leading-relaxed text-bulletin-ink dark:text-bulletin-inkDark">
+              <span className="font-sans font-semibold">{p.t.suggestion}: </span>
+              {c.suggestion}
+            </p>
+
+            {c.action === "message" && c.draft && (
+              <div className="mt-3 rounded-xl border border-bulletin-line bg-bulletin-bg p-3 dark:border-bulletin-lineDark dark:bg-bulletin-bgDark">
+                <p className="eyebrow">{p.t.draft}</p>
+                {editingId === c.initials ? (
+                  <>
+                    <label htmlFor={`edit-${c.initials}`} className="field-label mt-2">
+                      {p.uiLang === "id" ? `Edit pesan untuk ${c.initials}` : `Edit message for ${c.initials}`}
+                    </label>
+                    <textarea
+                      id={`edit-${c.initials}`}
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={4}
+                      className="field leading-relaxed"
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          update(c.initials, { draft: editText, draftEdited: true, draftApproved: false });
+                          setEditingId(null);
+                        }}
+                        className="btn-primary px-3"
+                      >
+                        {p.t.saveEdit}
+                      </button>
+                      <button type="button" onClick={() => setEditingId(null)} className="btn-ghost px-3">
+                        {p.t.cancel}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-[1.0625rem] leading-relaxed">{c.draft}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label={personLabel("edit", c.initials)}
+                        onClick={() => {
+                          setEditingId(c.initials);
+                          setEditText(c.draft || "");
+                        }}
+                        className="btn-small border border-bulletin-line bg-bulletin-card text-bulletin-ink hover:bg-bulletin-bg dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-inkDark dark:hover:bg-bulletin-cardDark"
+                      >
+                        {p.t.edit}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={
+                          c.draftApproved
+                            ? p.uiLang === "id"
+                              ? `Pesan untuk ${c.initials} sudah disetujui`
+                              : `Message for ${c.initials} approved`
+                            : personLabel("approve", c.initials)
+                        }
+                        onClick={() => update(c.initials, { draftApproved: true })}
+                        disabled={c.draftApproved}
+                        className={`btn-small ${
+                          c.draftApproved
+                            ? "bg-bulletin-badgeTint text-bulletin-oliveDeep dark:bg-bulletin-badgeTintDark dark:text-bulletin-oliveLight"
+                            : "bg-bulletin-olive text-white hover:bg-bulletin-oliveDeep dark:bg-bulletin-oliveLight dark:text-bulletin-bgDark dark:hover:bg-[#bcd8b2]"
+                        } disabled:opacity-70`}
+                      >
+                        {c.draftApproved && <CheckIcon />}
+                        {c.draftApproved ? p.t.approved : p.t.approve}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={
+                          copiedId === c.initials
+                            ? p.uiLang === "id"
+                              ? `Pesan untuk ${c.initials} disalin`
+                              : `Message for ${c.initials} copied`
+                            : personLabel("copy", c.initials)
+                        }
+                        onClick={() => copyDraft(c)}
+                        className="btn-small border border-bulletin-line bg-bulletin-card text-bulletin-ink hover:bg-bulletin-bg dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-inkDark dark:hover:bg-bulletin-cardDark"
+                      >
+                        {copiedId === c.initials && <CheckIcon />}
+                        {copiedId === c.initials ? p.t.copied : p.t.copy}
+                      </button>
+                      {!c.draftApproved && (
+                        <span className="inline-flex min-h-[2rem] items-center gap-1.5 font-sans text-xs font-semibold text-bulletin-muted dark:text-bulletin-mutedDark">
+                          <span className="border-b border-dashed border-bulletin-muted dark:border-bulletin-mutedDark">{p.t.notApproved}</span>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {c.action === "visit" && (
+              <div className="mt-3">
+                <p className="flex items-start gap-2 text-bulletin-brick dark:text-bulletin-brickLight">
+                  <span className="mt-1 shrink-0">
+                    <PhoneIcon />
+                  </span>
+                  {visitCalm}
+                </p>
+                <p className="mt-1 font-sans text-xs italic text-bulletin-muted dark:text-bulletin-mutedDark">{visitNote}</p>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <label className="card flex min-h-[2.75rem] cursor-pointer items-start gap-2 p-3 font-sans text-sm">
         <input
           type="checkbox"
           checked={p.aiNote}
           onChange={(e) => p.setAiNote(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-shepherd-600"
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[#3f5b3a] dark:accent-[#a9c79f]"
         />
         <span>{p.t.aiNoteToggle}</span>
       </label>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => p.onDownloadTxt("care")} className="rounded-xl bg-shepherd-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-shepherd-700">
-          {p.t.downloadTxt}
-        </button>
-        <button type="button" onClick={() => p.onDownloadPdf("care")} className="rounded-xl border border-shepherd-600 px-4 py-2.5 text-sm font-semibold text-shepherd-700 hover:bg-shepherd-100">
-          {p.t.downloadPdf}
-        </button>
-        <button type="button" onClick={() => p.onDownloadTxt("all")} className="rounded-xl bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-900">
-          {p.t.downloadAllTxt}
-        </button>
-        <button type="button" onClick={() => p.onDownloadPdf("all")} className="rounded-xl border border-stone-800 px-4 py-2.5 text-sm font-semibold text-stone-800 hover:bg-stone-100">
-          {p.t.downloadAllPdf}
-        </button>
+      <div className="sticky bottom-0 -mx-4 border-t border-bulletin-line bg-bulletin-bg px-4 pt-3 pb-safe dark:border-bulletin-lineDark dark:bg-bulletin-bgDark">
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => p.onDownloadTxt("care")} className="btn-primary">
+            <DownloadIcon />
+            {p.t.downloadTxt}
+          </button>
+          <button type="button" onClick={() => p.onDownloadPdf("care")} className="btn-secondary">
+            <DownloadIcon />
+            {p.t.downloadPdf}
+          </button>
+          <button type="button" onClick={() => p.onDownloadTxt("all")} className="btn-ghost">
+            <DownloadIcon />
+            {p.t.downloadAllTxt}
+          </button>
+          <button type="button" onClick={() => p.onDownloadPdf("all")} className="btn-ghost">
+            <DownloadIcon />
+            {p.t.downloadAllPdf}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -12,6 +12,34 @@ import CareScreen from "@/app/components/CareScreen";
 
 type Step = 1 | 2 | 3;
 
+/** Thin-line cross, the single small symbol in the logo. Decorative. */
+function CrossIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 3v18" />
+      <path d="M7.5 8h9" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.5h.01" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [uiLang, setUiLang] = useState<UiLang>("en");
   const t = getStrings(uiLang);
@@ -80,55 +108,90 @@ export default function Home() {
   ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-2xl px-4 pb-12 pt-6">
-      <header className="text-center">
-        <div className="flex items-center justify-end gap-1 text-sm">
+    <div className="mx-auto min-h-screen w-full max-w-bulletin px-4 pb-12 pt-6">
+      <a href="#main-content" className="skip-link">
+        {uiLang === "id" ? "Lewati ke konten utama" : "Skip to main content"}
+      </a>
+
+      <header>
+        <div className="flex items-center justify-end gap-2" role="group" aria-label={uiLang === "id" ? "Bahasa antarmuka" : "Interface language"}>
           <button
             type="button"
             onClick={() => setUiLang("en")}
-            className={`rounded-full px-3 py-1 font-semibold ${uiLang === "en" ? "bg-shepherd-600 text-white" : "bg-white text-stone-600 border border-stone-300"}`}
+            aria-pressed={uiLang === "en"}
+            className={`inline-flex min-h-[2.75rem] min-w-[2.75rem] items-center justify-center rounded-full px-3 font-sans text-sm font-semibold ${
+              uiLang === "en"
+                ? "bg-bulletin-olive text-white dark:bg-bulletin-oliveLight dark:text-bulletin-bgDark"
+                : "border border-bulletin-line bg-bulletin-card text-bulletin-muted dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-mutedDark"
+            }`}
           >
             EN
           </button>
           <button
             type="button"
             onClick={() => setUiLang("id")}
-            className={`rounded-full px-3 py-1 font-semibold ${uiLang === "id" ? "bg-shepherd-600 text-white" : "bg-white text-stone-600 border border-stone-300"}`}
+            aria-pressed={uiLang === "id"}
+            className={`inline-flex min-h-[2.75rem] min-w-[2.75rem] items-center justify-center rounded-full px-3 font-sans text-sm font-semibold ${
+              uiLang === "id"
+                ? "bg-bulletin-olive text-white dark:bg-bulletin-oliveLight dark:text-bulletin-bgDark"
+                : "border border-bulletin-line bg-bulletin-card text-bulletin-muted dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-mutedDark"
+            }`}
           >
             ID
           </button>
         </div>
-        <h1 className="mt-2 font-serif text-4xl font-bold text-stone-900">ShepherdFlow</h1>
-        <p className="mt-1 text-[15px] text-stone-600">{t.tagline}</p>
+
+        <div className="mt-4 flex items-center gap-2 text-bulletin-olive dark:text-bulletin-oliveLight">
+          <CrossIcon />
+          <h1 className="font-serif text-3xl font-semibold leading-tight">ShepherdFlow</h1>
+        </div>
+        <p className="mt-1 font-sans text-sm text-bulletin-muted dark:text-bulletin-mutedDark">{t.tagline}</p>
+        <p className="mt-2 flex items-center gap-1.5 font-sans text-xs font-medium text-bulletin-muted dark:text-bulletin-mutedDark">
+          <InfoIcon />
+          {t.aiDraftLabel}
+        </p>
+        <div className="mt-4 border-t-2 border-bulletin-gold" aria-hidden="true" />
       </header>
 
-      <nav className="mt-5 flex gap-1 rounded-xl bg-white p-1 shadow-sm" aria-label="Steps">
-        {steps.map((s) => {
-          const disabled = s.n > 1 && !result;
-          const active = step === s.n;
-          return (
-            <button
-              key={s.n}
-              type="button"
-              disabled={disabled}
-              onClick={() => setStep(s.n)}
-              className={`flex-1 rounded-lg px-2 py-2 text-xs font-semibold sm:text-sm ${
-                active ? "bg-shepherd-600 text-white" : disabled ? "text-stone-300" : "text-stone-600 hover:bg-shepherd-100"
-              }`}
-            >
-              {s.n}. {s.label}
-            </button>
-          );
-        })}
+      <nav className="mt-5" aria-label={uiLang === "id" ? "Langkah" : "Steps"}>
+        <ol className="flex border-b border-bulletin-line dark:border-bulletin-lineDark">
+          {steps.map((s) => {
+            const disabled = s.n > 1 && !result;
+            const active = step === s.n;
+            return (
+              <li key={s.n} className="flex-1">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setStep(s.n)}
+                  aria-current={active ? "step" : undefined}
+                  className={`flex min-h-[2.75rem] w-full flex-col items-center justify-center gap-0.5 border-b-[3px] px-1 py-2 font-sans text-xs font-semibold sm:text-sm ${
+                    active
+                      ? "border-bulletin-olive text-bulletin-ink dark:border-bulletin-oliveLight dark:text-bulletin-inkDark"
+                      : disabled
+                        ? "border-transparent text-bulletin-muted/50 dark:text-bulletin-mutedDark/50"
+                        : "border-transparent text-bulletin-muted hover:text-bulletin-ink dark:text-bulletin-mutedDark dark:hover:text-bulletin-inkDark"
+                  }`}
+                >
+                  <span aria-hidden="true">{s.n}</span>
+                  <span>{s.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
       </nav>
 
       {downloadMsg && (
-        <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-center text-sm text-green-800">
-          ✓ {t.downloadNote}
+        <div role="status" className="card mt-4 flex items-center gap-2 p-3 font-sans text-sm text-bulletin-ink dark:text-bulletin-inkDark">
+          <span className="text-bulletin-olive dark:text-bulletin-oliveLight">
+            <CheckIcon />
+          </span>
+          {t.downloadNote}
         </div>
       )}
 
-      <div className="mt-5">
+      <main id="main-content" className="mt-6">
         {step === 1 && (
           <InputScreen
             t={t}
@@ -152,16 +215,17 @@ export default function Home() {
           <>
             <ResultsScreen
               t={t}
+              uiLang={uiLang}
               result={currentResult()!}
               transcript={transcript}
               onDownloadTxt={() => doDownload("txt", "sermon")}
               onDownloadPdf={() => doDownload("pdf", "sermon")}
             />
-            <div className="mt-4 flex justify-between">
-              <button type="button" onClick={() => setStep(1)} className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700">
+            <div className="mt-6 flex justify-between gap-2">
+              <button type="button" onClick={() => setStep(1)} className="btn-ghost">
                 ← {t.back}
               </button>
-              <button type="button" onClick={() => setStep(3)} className="rounded-xl bg-shepherd-600 px-4 py-2.5 text-sm font-semibold text-white">
+              <button type="button" onClick={() => setStep(3)} className="btn-primary">
                 {t.step3} →
               </button>
             </div>
@@ -180,19 +244,22 @@ export default function Home() {
               onDownloadTxt={(s) => doDownload("txt", s)}
               onDownloadPdf={(s) => doDownload("pdf", s)}
             />
-            <div className="mt-4">
-              <button type="button" onClick={() => setStep(2)} className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700">
+            <div className="mt-6">
+              <button type="button" onClick={() => setStep(2)} className="btn-ghost">
                 ← {t.back}
               </button>
             </div>
           </>
         )}
-      </div>
+      </main>
 
-      <footer className="mt-8 border-t border-stone-200 pt-4 text-center text-xs leading-relaxed text-stone-500">
-        <p>{t.aiDraftLabel}</p>
-        <p className="mt-1">
-          <Link href="/responsible-ai" className="font-medium text-shepherd-700 underline">
+      <footer className="mt-8 border-t border-bulletin-line pt-4 dark:border-bulletin-lineDark">
+        <p className="flex items-center gap-1.5 font-sans text-xs font-medium text-bulletin-muted dark:text-bulletin-mutedDark">
+          <InfoIcon />
+          {t.aiDraftLabel}
+        </p>
+        <p className="mt-2 font-sans text-sm leading-relaxed text-bulletin-muted dark:text-bulletin-mutedDark">
+          <Link href="/responsible-ai" className="inline-flex min-h-[2.75rem] items-center font-semibold text-bulletin-olive underline underline-offset-2 dark:text-bulletin-oliveLight">
             {t.responsibleAi}
           </Link>
           {" · "}
@@ -201,6 +268,6 @@ export default function Home() {
             : "Congregant data is never stored on the server. No automatic sending."}
         </p>
       </footer>
-    </main>
+    </div>
   );
 }

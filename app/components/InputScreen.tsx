@@ -29,6 +29,7 @@ const CATEGORIES: Category[] = ["new", "absent", "sick", "grieving", "birthday",
 export default function InputScreen(p: Props) {
   const words = p.transcript.trim().split(/\s+/).filter(Boolean).length;
   const overLimit = words > 8000;
+  const hasError = p.error !== null;
 
   const addPerson = () => {
     const id = `c${Date.now()}`;
@@ -39,13 +40,18 @@ export default function InputScreen(p: Props) {
   };
 
   return (
-    <div className="space-y-5">
-      <div>
-        <div className="mb-1 flex items-end justify-between">
-          <label htmlFor="transcript" className="text-sm font-semibold text-stone-800">
+    <div className="space-y-6">
+      <section aria-labelledby="transcript-heading">
+        <h2 id="transcript-heading" className="sr-only">
+          {p.t.transcriptLabel}
+        </h2>
+        <div className="mb-1 flex items-end justify-between gap-2">
+          <label htmlFor="transcript" className="field-label mb-0">
             {p.t.transcriptLabel}
           </label>
-          <span className={`text-xs ${overLimit ? "font-semibold text-red-600" : "text-stone-500"}`}>
+          <span
+            className={`font-sans text-xs ${overLimit ? "font-semibold text-bulletin-brick dark:text-bulletin-brickLight" : "text-bulletin-muted dark:text-bulletin-mutedDark"}`}
+          >
             {words.toLocaleString()} {p.t.words} · {p.t.wordLimit}
           </span>
         </div>
@@ -55,149 +61,176 @@ export default function InputScreen(p: Props) {
           onChange={(e) => p.setTranscript(e.target.value)}
           placeholder={p.t.transcriptPlaceholder}
           rows={10}
-          className="w-full rounded-xl border border-stone-300 bg-white p-3 leading-relaxed shadow-sm focus:border-shepherd-500 focus:outline-none focus:ring-2 focus:ring-shepherd-200"
+          aria-invalid={hasError}
+          aria-describedby={hasError ? "transcript-error" : "transcript-hint"}
+          className="field min-h-[12rem] leading-relaxed"
         />
-        <div className="mt-2 flex flex-wrap gap-2">
+        <p id="transcript-hint" className="field-hint">
+          {p.uiLang === "id"
+            ? "Tempel atau ketik khotbah lengkap. Tidak ada yang diunggah atau disimpan."
+            : "Paste or type the full sermon. Nothing is uploaded or stored."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => p.setTranscript(SAMPLE_SERMON)}
-            className="rounded-full bg-shepherd-100 px-3 py-1.5 text-sm font-medium text-shepherd-800 hover:bg-shepherd-200"
+            className="btn-small border border-bulletin-line bg-bulletin-badgeTint text-bulletin-oliveDeep hover:bg-bulletin-badgeTint dark:border-bulletin-lineDark dark:bg-bulletin-badgeTintDark dark:text-bulletin-oliveLight"
           >
             {p.t.useSample}
           </button>
           <button
             type="button"
             onClick={() => p.setTranscript("")}
-            className="rounded-full bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-200"
+            className="btn-small border border-bulletin-line bg-bulletin-card text-bulletin-muted hover:bg-bulletin-bg dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-mutedDark dark:hover:bg-bulletin-cardDark"
           >
             {p.t.clear}
           </button>
           <button
             type="button"
             onClick={() => p.setCongregants(SAMPLE_CONGREGANTS)}
-            className="rounded-full bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-200"
+            className="btn-small border border-bulletin-line bg-bulletin-card text-bulletin-muted hover:bg-bulletin-bg dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-mutedDark dark:hover:bg-bulletin-cardDark"
           >
             {p.uiLang === "id" ? "Isi jemaat contoh" : "Load sample congregants"}
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div>
-          <label className="mb-1 block text-sm font-semibold text-stone-800">{p.t.tradition}</label>
-          <select
-            value={p.tradition}
-            onChange={(e) => p.setTradition(e.target.value as Tradition)}
-            className="w-full rounded-xl border border-stone-300 bg-white p-2.5 shadow-sm focus:border-shepherd-500 focus:outline-none"
-          >
-            {TRADITIONS.map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </select>
+      <section aria-label={p.uiLang === "id" ? "Pengaturan khotbah" : "Sermon settings"}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label htmlFor="tradition" className="field-label">
+              {p.t.tradition}
+            </label>
+            <select
+              id="tradition"
+              value={p.tradition}
+              onChange={(e) => p.setTradition(e.target.value as Tradition)}
+              className="field"
+            >
+              {TRADITIONS.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="tone" className="field-label">
+              {p.t.tone}
+            </label>
+            <select id="tone" value={p.tone} onChange={(e) => p.setTone(e.target.value as Tone)} className="field">
+              <option value="formal">{p.t.formal}</option>
+              <option value="warm">{p.t.warm}</option>
+              <option value="simple">{p.t.simple}</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="output-lang" className="field-label">
+              {p.t.outputLang}
+            </label>
+            <select
+              id="output-lang"
+              value={p.outputLang}
+              onChange={(e) => p.setOutputLang(e.target.value as OutputLang)}
+              className="field"
+            >
+              <option value="en">English</option>
+              <option value="id">Bahasa Indonesia</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-semibold text-stone-800">{p.t.tone}</label>
-          <select
-            value={p.tone}
-            onChange={(e) => p.setTone(e.target.value as Tone)}
-            className="w-full rounded-xl border border-stone-300 bg-white p-2.5 shadow-sm focus:border-shepherd-500 focus:outline-none"
-          >
-            <option value="formal">{p.t.formal}</option>
-            <option value="warm">{p.t.warm}</option>
-            <option value="simple">{p.t.simple}</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-semibold text-stone-800">{p.t.outputLang}</label>
-          <select
-            value={p.outputLang}
-            onChange={(e) => p.setOutputLang(e.target.value as OutputLang)}
-            className="w-full rounded-xl border border-stone-300 bg-white p-2.5 shadow-sm focus:border-shepherd-500 focus:outline-none"
-          >
-            <option value="en">English</option>
-            <option value="id">Bahasa Indonesia</option>
-          </select>
-        </div>
-      </div>
+      </section>
 
-      <div>
-        <h2 className="text-sm font-semibold text-stone-800">{p.t.congregantsTitle}</h2>
-        <p className="mt-0.5 text-xs leading-relaxed text-stone-500">{p.t.congregantsHint}</p>
-        <div className="mt-2 space-y-2">
-          {p.congregants.map((c) => (
-            <div key={c.id} className="rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
-              <div className="flex gap-2">
-                <input
-                  value={c.initials}
-                  onChange={(e) => updatePerson(c.id, { initials: e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4) })}
-                  placeholder={p.t.initials}
-                  aria-label={p.t.initials}
-                  className="w-20 rounded-lg border border-stone-300 p-2 text-center font-semibold uppercase focus:border-shepherd-500 focus:outline-none"
-                />
-                <select
-                  value={c.category}
-                  onChange={(e) => updatePerson(c.id, { category: e.target.value as Category })}
-                  aria-label={p.t.category}
-                  className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white p-2 focus:border-shepherd-500 focus:outline-none"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat][p.uiLang]}
-                    </option>
-                  ))}
-                </select>
+      <section aria-labelledby="congregants-heading">
+        <h2 id="congregants-heading" className="font-sans text-sm font-semibold text-bulletin-ink dark:text-bulletin-inkDark">
+          {p.t.congregantsTitle}
+        </h2>
+        <p className="mt-1 font-sans text-xs leading-relaxed text-bulletin-muted dark:text-bulletin-mutedDark">{p.t.congregantsHint}</p>
+        <ul className="mt-3 space-y-3">
+          {p.congregants.map((c, idx) => (
+            <li key={c.id} className="card p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label htmlFor={`initials-${c.id}`} className="field-label">
+                    {p.t.initials}
+                  </label>
+                  <input
+                    id={`initials-${c.id}`}
+                    value={c.initials}
+                    onChange={(e) => updatePerson(c.id, { initials: e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4) })}
+                    placeholder={p.uiLang === "id" ? "Contoh: R.S." : "E.g. R.S."}
+                    className="field w-24 text-center font-semibold uppercase"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <label htmlFor={`category-${c.id}`} className="field-label">
+                    {p.t.category}
+                  </label>
+                  <select
+                    id={`category-${c.id}`}
+                    value={c.category}
+                    onChange={(e) => updatePerson(c.id, { category: e.target.value as Category })}
+                    className="field"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {CATEGORY_LABELS[cat][p.uiLang]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   type="button"
                   onClick={() => p.setCongregants(p.congregants.filter((x) => x.id !== c.id))}
-                  className="rounded-lg px-2 text-sm text-red-600 hover:bg-red-50"
+                  aria-label={
+                    p.uiLang === "id"
+                      ? `Hapus jemaat ${c.initials || idx + 1}`
+                      : `Remove congregant ${c.initials || idx + 1}`
+                  }
+                  className="btn-small text-bulletin-brick hover:bg-bulletin-brickSoft dark:text-bulletin-brickLight dark:hover:bg-bulletin-brickSoftDark"
                 >
                   {p.t.remove}
                 </button>
               </div>
-              <input
-                value={c.note}
-                onChange={(e) => updatePerson(c.id, { note: e.target.value })}
-                placeholder={p.t.note}
-                aria-label={p.t.note}
-                className="mt-2 w-full rounded-lg border border-stone-300 p-2 focus:border-shepherd-500 focus:outline-none"
-              />
-            </div>
+              <div className="mt-3">
+                <label htmlFor={`note-${c.id}`} className="field-label">
+                  {p.t.note}
+                </label>
+                <input
+                  id={`note-${c.id}`}
+                  value={c.note}
+                  onChange={(e) => updatePerson(c.id, { note: e.target.value })}
+                  placeholder={p.t.note}
+                  className="field"
+                />
+              </div>
+            </li>
           ))}
-        </div>
-        <button
-          type="button"
-          onClick={addPerson}
-          className="mt-2 rounded-full border border-shepherd-500 px-3 py-1.5 text-sm font-medium text-shepherd-700 hover:bg-shepherd-100"
-        >
+        </ul>
+        <button type="button" onClick={addPerson} className="btn-secondary mt-3">
           {p.t.addPerson}
         </button>
-      </div>
+      </section>
 
       {p.error && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <p>{p.error}</p>
-          <button
-            type="button"
-            onClick={p.onGenerate}
-            disabled={p.loading}
-            className="mt-2 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-          >
+        <div id="transcript-error" role="alert" className="card border-l-4 border-l-bulletin-brick bg-bulletin-brickSoft p-4 dark:bg-bulletin-brickSoftDark">
+          <p className="font-sans text-sm font-medium text-bulletin-brick dark:text-bulletin-brickLight">{p.error}</p>
+          <button type="button" onClick={p.onGenerate} disabled={p.loading} className="btn-primary mt-3 disabled:opacity-50">
             {p.t.retry}
           </button>
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={p.onGenerate}
-        disabled={p.loading || overLimit}
-        className="w-full rounded-xl bg-shepherd-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-shepherd-700 disabled:opacity-50"
-      >
-        {p.loading ? p.t.generating : p.t.generate}
-      </button>
-      {p.loading && <p className="text-center text-sm text-stone-500">{p.t.loading}</p>}
+      <div>
+        <button type="button" onClick={p.onGenerate} disabled={p.loading || overLimit} className="btn-primary w-full text-base disabled:opacity-50">
+          {p.loading ? p.t.generating : p.t.generate}
+        </button>
+        {p.loading && (
+          <p role="status" aria-live="polite" className="mt-3 text-center font-sans text-sm text-bulletin-muted dark:text-bulletin-mutedDark">
+            {p.t.loading}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

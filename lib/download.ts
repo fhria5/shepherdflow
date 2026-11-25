@@ -34,6 +34,7 @@ export function buildTxt(result: GenerateResult, opts: DownloadOptions): string 
   L.push(`# ShepherdFlow — ${en ? "Sermon Follow-up" : "Tindak Lanjut Khotbah"}`);
   L.push(`${en ? "Date" : "Tanggal"}: ${todayStr()}`);
   L.push("");
+  L.push("----------------------------------------------------------------");
   L.push(LABEL);
   if (opts.aiNote) L.push(en ? "Note: prepared with AI help, reviewed by pastor." : "Catatan: disusun dengan bantuan AI, ditinjau pastor.");
   if (result.demoMode) L.push(en ? "Demo mode — sample results." : "Mode demo — hasil contoh.");
@@ -81,6 +82,7 @@ export function buildTxt(result: GenerateResult, opts: DownloadOptions): string 
     }
     L.push("");
   }
+  L.push("----------------------------------------------------------------");
   L.push(LABEL);
   return L.join("\n");
 }
@@ -129,8 +131,17 @@ export async function downloadPdfFile(
       y = 18;
     }
   };
+  /** Thin decorative rule. Gold for the header rule only; line colour elsewhere. */
+  const rule = (gold: boolean) => {
+    checkPage(6);
+    if (gold) doc.setDrawColor(184, 146, 58);
+    else doc.setDrawColor(220, 210, 188);
+    doc.setLineWidth(0.6);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+  };
   const write = (text: string, size = 11, bold = false, gap = 5) => {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFont("times", bold ? "bold" : "normal");
     doc.setFontSize(size);
     const lines = doc.splitTextToSize(pdfSafe(text), maxW);
     for (const line of lines) {
@@ -143,12 +154,14 @@ export async function downloadPdfFile(
   const heading = (text: string) => {
     checkPage(12);
     y += 2;
+    rule(false);
     write(text, 13, true, 3);
   };
 
   write("ShepherdFlow", 18, true, 1);
   write(en ? "Sermon follow-up" : "Tindak lanjut khotbah", 12, false, 2);
   write(`${en ? "Date" : "Tanggal"}: ${todayStr()}`, 10, false, 4);
+  rule(true);
   write(LABEL, 10, true, 2);
   if (opts.aiNote)
     write(en ? "Note: prepared with AI help, reviewed by pastor." : "Catatan: disusun dengan bantuan AI, ditinjau pastor.", 10, false, 2);
@@ -228,6 +241,7 @@ export async function downloadPdfFile(
   }
 
   y += 4;
+  rule(false);
   write(LABEL, 10, true, 0);
   if (returnBytes) return doc.output("arraybuffer") as ArrayBuffer;
   doc.save(`${fileBaseName()}.pdf`);
