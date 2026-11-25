@@ -188,7 +188,12 @@ export async function POST(request: Request) {
       (raw) => SermonOutputSchema.parse(raw),
       "sermon"
     );
-    const care = await callLlmJson(
+    const care = await (async () => {
+      // Small gap between the two calls: the Verboo router rejects
+      // bursts, so do not start the care call the instant the sermon
+      // call returns.
+      await new Promise((r) => setTimeout(r, 3000));
+      return callLlmJson(
       [
         { role: "system", content: careSystemPrompt(req) },
         { role: "user", content: text },
@@ -196,6 +201,7 @@ export async function POST(request: Request) {
       (raw) => CareOutputSchema.parse(raw),
       "care"
     );
+    })();
     const merged = GenerateOutputSchema.parse({ ...sermon, ...care });
     const result = postProcess(req, merged);
     return NextResponse.json({ result });

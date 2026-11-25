@@ -130,8 +130,11 @@ async function postChat(
 
 /**
  * One JSON call against one provider, with structured-output handling:
- * try response_format=json_object first; providers that reject it with 403
- * (e.g. Verboo: structured_output_not_enabled) are retried once without it.
+ * Verboo's router rejects response_format=json_object with 403
+ * (structured_output_not_enabled) AND counts those failed calls toward
+ * its burst/rate limit, so for Verboo we go plain-text first and parse
+ * the JSON out of the reply. Other providers still try json_object
+ * first and fall back to plain text on 403.
  * On parse failure the caller retries with a "valid JSON only" instruction.
  */
 async function callJsonOnce<T>(
@@ -143,15 +146,20 @@ async function callJsonOnce<T>(
   const msgs = strictJsonInstruction
     ? [...messages, { role: "user", content: "Return only valid JSON, no other text." } as LlmMessage]
     : messages;
+  const skipJsonFormat = provider.baseUrl.includes("verboo");
   let content: string;
-  try {
-    content = await postChat(provider, msgs, true);
-  } catch (e) {
-    if (e instanceof LlmError && e.status === 403) {
-      // Provider does not support response_format — retry as plain text.
-      content = await postChat(provider, msgs, false);
-    } else {
-      throw e;
+  if (skipJsonFormat) {
+    content = await postChat(provider, msgs, false);
+  } else {
+    try {
+      content = await postChat(provider, msgs, true);
+    } catch (e) {
+      if (e instanceof LlmError && e.status === 403) {
+        // Provider does not support response_format — retry as plain text.
+        content = await postChat(provider, msgs, false);
+      } else {
+        throw e;
+      }
     }
   }
   let raw: unknown;
@@ -186,9 +194,9 @@ export async function callLlmJson<T>(
   for (const provider of providers) {
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt === 1) {
-        // Brief backoff so a transient provider 503/overload can clear
-        // before the single retry hits the same window again.
-        await new Promise((r) => setTimeout(r, 2000));
+        // Longer backoff: the Verboo router rejects bursts with 503/429,
+        // so give the rate-limit window time to clear before retrying.
+        await new Promise((r) => setTimeout(r, 5000));
       }
       try {
         const out = await callJsonOnce(provider, messages, parse, attempt === 1);
