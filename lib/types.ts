@@ -57,6 +57,18 @@ export const GenerateOutputSchema = z.object({
   care: z.array(CareItemSchema),
 });
 
+/** Sermon part of the output — one of the two parallel LLM calls. */
+export const SermonOutputSchema = z.object({
+  summary: z.array(SummaryPointSchema).min(3).max(4),
+  questions: z.array(QuestionSchema).length(5),
+  devotions: z.array(DevotionSchema).length(5),
+});
+
+/** Care part of the output — the other parallel LLM call. */
+export const CareOutputSchema = z.object({
+  care: z.array(CareItemSchema),
+});
+
 export type GenerateOutput = z.infer<typeof GenerateOutputSchema>;
 
 export interface SummaryPoint extends z.infer<typeof SummaryPointSchema> {

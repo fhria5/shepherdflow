@@ -36,18 +36,55 @@ npm run build                 # production build check
 
 | Variable | Required | Description |
 |---|---|---|
-| `LLM_BASE_URL` | No | OpenAI-compatible chat-completions base URL (default `https://api.openai.com/v1`) |
-| `LLM_API_KEY` | No | API key. **Leave empty for demo mode** — the app shows prepared sample results and every feature still works. The key is only read server-side, never sent to the client. |
-| `LLM_MODEL` | No | Model name (default `gpt-4o-mini`) |
+| `LLM_BASE_URL` | No | OpenAI-compatible chat-completions base URL (default `https://code.verboo.ai/router/v1`) |
+| `LLM_API_KEY` | No | API key. **Leave empty for demo mode** — the app shows prepared sample results and every feature still works. The key is only read server-side, never sent to the client. When a key is set and the AI call fails, the app shows a clear error with a retry button — it never silently falls back to demo results. |
+| `LLM_MODEL` | No | Model name (default `glm-5.3-flash`) |
+| `LLM_FALLBACK_BASE_URL` | No | Fallback provider base URL (default: same as `LLM_BASE_URL`) |
+| `LLM_FALLBACK_API_KEY` | No | Fallback provider API key (default: same as `LLM_API_KEY`) |
+| `LLM_FALLBACK_MODEL` | No | Fallback model name (default: same as `LLM_MODEL`) |
+
+How the LLM is wired: all AI calls go through the server-side route
+`/api/generate`, which makes **two calls** — one for the sermon
+summary/questions/devotions and one for care triage — each with a 45-second
+timeout, one retry on bad JSON, and automatic fallback to the fallback
+provider. The two calls run **sequentially, not in parallel**: the Verboo
+router rejects bursts of concurrent requests with HTTP 503 while single
+calls succeed, so parallel calls proved unreliable on this provider. Providers that reject `response_format: json_object` (Verboo
+returns 403 `structured_output_not_enabled`) are automatically retried as
+plain text and the JSON is extracted from the reply. Server logs contain
+only status and duration, never transcripts or congregant data.
+
+### Connecting another provider
+
+Any OpenAI-compatible chat-completions provider works: set its base URL,
+key, and model name in the three `LLM_*` variables. To use a second
+provider as automatic fallback, fill in the three `LLM_FALLBACK_*`
+variables. Providers that support structured output get
+`response_format: json_object`; providers that reject it are retried
+without it.
+
+### Diagnostics
+
+`GET /api/health` reports whether each env var is set (true/false only,
+never the values), the configured models, and a short live probe where the
+model is asked to reply `OK`. Without a key it reports demo mode.
 
 ## Deploy to Vercel
 
 1. Push this repo to GitHub.
 2. In Vercel: **Add New → Project → Import** the repo (framework: Next.js).
-3. Optionally set `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` as Production
-   environment variables. Without `LLM_API_KEY` the deployment runs in demo mode.
-4. Deploy. Remove Vercel Authentication (SSO) protection on the project if the
+3. Set environment variables in **Settings → Environment Variables** (Production): `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally the three `LLM_FALLBACK_*` variables. Without `LLM_API_KEY` the deployment runs in demo mode.
+4. **Redeploy** after changing env vars (env changes only apply to new deployments). Then check `/api/health` — it should report `mode: "live"` and `test.ok: true`.
+5. Remove Vercel Authentication (SSO) protection on the project if the
    site should open without a login.
+
+Example values for Verboo (the router used by this project's other apps):
+
+| Variable | Value |
+|---|---|
+| `LLM_BASE_URL` | `https://code.verboo.ai/router/v1` |
+| `LLM_MODEL` | `glm-5.3-flash` (or `deepseek-v4-pro-0813`, the fastest tested) |
+| `LLM_API_KEY` | your Verboo API key (paste in the Vercel dashboard, never in code) |
 
 ## Privacy & safety
 

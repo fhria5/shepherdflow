@@ -177,7 +177,15 @@ export default function InputScreen(p: Props) {
 
       {p.error && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {p.error}
+          <p>{p.error}</p>
+          <button
+            type="button"
+            onClick={p.onGenerate}
+            disabled={p.loading}
+            className="mt-2 rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {p.t.retry}
+          </button>
         </div>
       )}
 
