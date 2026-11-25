@@ -1,9 +1,27 @@
 "use client";
 
-import type { Category, Congregant, OutputLang, Tone, Tradition } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { Audience, Category, Congregant, OutputLang, Tone, Tradition } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
+import { OUTPUT_LANGUAGES, countUnits, isCharCountLang, maxUnits } from "@/lib/languages";
 import { SAMPLE_CONGREGANTS, SAMPLE_SERMON } from "@/lib/sample";
 import type { Strings } from "@/lib/i18n";
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult:
+    | ((event: {
+        resultIndex: number;
+        results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
+      }) => void)
+    | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
 
 interface Props {
   t: Strings;
@@ -16,6 +34,8 @@ interface Props {
   setTone: (v: Tone) => void;
   outputLang: OutputLang;
   setOutputLang: (v: OutputLang) => void;
+  audience: Audience;
+  setAudience: (v: Audience) => void;
   congregants: Congregant[];
   setCongregants: (v: Congregant[]) => void;
   onGenerate: () => void;
@@ -23,13 +43,79 @@ interface Props {
   error: string | null;
 }
 
-const TRADITIONS: Tradition[] = ["Protestant", "Catholic", "Pentecostal/Charismatic", "Other"];
+const TRADITIONS: Tradition[] = [
+  "Protestant",
+  "Catholic",
+  "Orthodox",
+  "Pentecostal/Charismatic",
+  "Evangelical",
+  "Anglican/Lutheran",
+  "Other",
+];
 const CATEGORIES: Category[] = ["new", "absent", "sick", "grieving", "birthday", "other"];
+const OUTPUT_LANG_CODES = Object.keys(OUTPUT_LANGUAGES) as OutputLang[];
 
 export default function InputScreen(p: Props) {
-  const words = p.transcript.trim().split(/\s+/).filter(Boolean).length;
-  const overLimit = words > 8000;
+  const units = countUnits(p.transcript, p.outputLang);
+  const charLang = isCharCountLang(p.outputLang);
+  const overLimit = units > maxUnits(p.outputLang);
   const hasError = p.error !== null;
+  const isBeta = OUTPUT_LANGUAGES[p.outputLang].beta;
+
+  // Voice dictation (Web Speech API). Not all browsers support it;
+  // the button reports that plainly instead of failing silently.
+  const [dictating, setDictating] = useState(false);
+  const [dictateMsg, setDictateMsg] = useState<string | null>(null);
+  const [dictateLang, setDictateLang] = useState(OUTPUT_LANGUAGES[p.outputLang].speechLocale);
+  const recogRef = useRef<{ stop: () => void } | null>(null);
+
+  // Follow the output language unless the pastor picked another one.
+  useEffect(() => {
+    setDictateLang(OUTPUT_LANGUAGES[p.outputLang].speechLocale);
+  }, [p.outputLang]);
+
+  const toggleDictation = () => {
+    if (dictating) {
+      recogRef.current?.stop();
+      setDictating(false);
+      return;
+    }
+    const SR =
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    if (!SR) {
+      setDictateMsg(p.t.dictateUnsupported);
+      return;
+    }
+    try {
+      const rec = new SR();
+      recogRef.current = rec;
+      rec.lang = dictateLang;
+      rec.interimResults = true;
+      rec.continuous = true;
+      const base = p.transcript;
+      let finals = "";
+      rec.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const part = event.results[i][0].transcript;
+          if (event.results[i].isFinal) finals += part;
+          else interim += part;
+        }
+        p.setTranscript([base, finals, interim].filter(Boolean).join(" "));
+      };
+      rec.onerror = () => {
+        setDictating(false);
+        setDictateMsg(p.t.dictateError);
+      };
+      rec.onend = () => setDictating(false);
+      rec.start();
+      setDictating(true);
+      setDictateMsg(null);
+    } catch {
+      setDictateMsg(p.t.dictateError);
+    }
+  };
 
   const addPerson = () => {
     const id = `c${Date.now()}`;
@@ -52,7 +138,7 @@ export default function InputScreen(p: Props) {
           <span
             className={`font-sans text-xs ${overLimit ? "font-semibold text-bulletin-brick dark:text-bulletin-brickLight" : "text-bulletin-muted dark:text-bulletin-mutedDark"}`}
           >
-            {words.toLocaleString()} {p.t.words} · {p.t.wordLimit}
+            {units.toLocaleString()} {charLang ? p.t.characters : p.t.words} · {charLang ? p.t.charLimit : p.t.wordLimit}
           </span>
         </div>
         <textarea
@@ -93,10 +179,46 @@ export default function InputScreen(p: Props) {
             {p.uiLang === "id" ? "Isi jemaat contoh" : "Load sample congregants"}
           </button>
         </div>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <button
+            type="button"
+            onClick={toggleDictation}
+            aria-pressed={dictating}
+            className={`btn-small border ${
+              dictating
+                ? "border-bulletin-brick bg-bulletin-brickSoft text-bulletin-brick dark:border-bulletin-brickLight dark:bg-bulletin-brickSoftDark dark:text-bulletin-brickLight"
+                : "border-bulletin-line bg-bulletin-card text-bulletin-ink hover:bg-bulletin-bg dark:border-bulletin-lineDark dark:bg-transparent dark:text-bulletin-inkDark dark:hover:bg-bulletin-cardDark"
+            }`}
+          >
+            {dictating ? p.t.dictating : p.t.dictate}
+          </button>
+          <div>
+            <label htmlFor="dictate-lang" className="field-label">
+              {p.t.dictateLang}
+            </label>
+            <select
+              id="dictate-lang"
+              value={dictateLang}
+              onChange={(e) => setDictateLang(e.target.value)}
+              className="field w-auto"
+            >
+              {OUTPUT_LANG_CODES.map((code) => (
+                <option key={code} value={OUTPUT_LANGUAGES[code].speechLocale}>
+                  {OUTPUT_LANGUAGES[code].nativeName} ({OUTPUT_LANGUAGES[code].speechLocale})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {dictateMsg && (
+          <p role="status" className="mt-2 font-sans text-xs leading-relaxed text-bulletin-muted dark:text-bulletin-mutedDark">
+            {dictateMsg}
+          </p>
+        )}
       </section>
 
       <section aria-label={p.uiLang === "id" ? "Pengaturan khotbah" : "Sermon settings"}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="tradition" className="field-label">
               {p.t.tradition}
@@ -113,6 +235,7 @@ export default function InputScreen(p: Props) {
                 </option>
               ))}
             </select>
+            <p className="field-hint">{p.t.traditionNote}</p>
           </div>
           <div>
             <label htmlFor="tone" className="field-label">
@@ -134,8 +257,28 @@ export default function InputScreen(p: Props) {
               onChange={(e) => p.setOutputLang(e.target.value as OutputLang)}
               className="field"
             >
-              <option value="en">English</option>
-              <option value="id">Bahasa Indonesia</option>
+              {OUTPUT_LANG_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {OUTPUT_LANGUAGES[code].nativeName}
+                  {OUTPUT_LANGUAGES[code].beta ? ` (${p.t.betaTag})` : ""}
+                </option>
+              ))}
+            </select>
+            {isBeta && <p className="field-hint">{p.t.betaNote}</p>}
+          </div>
+          <div>
+            <label htmlFor="audience" className="field-label">
+              {p.t.audience}
+            </label>
+            <select
+              id="audience"
+              value={p.audience}
+              onChange={(e) => p.setAudience(e.target.value as Audience)}
+              className="field"
+            >
+              <option value="adults">{p.t.audienceAdults}</option>
+              <option value="teens">{p.t.audienceTeens}</option>
+              <option value="children">{p.t.audienceChildren}</option>
             </select>
           </div>
         </div>

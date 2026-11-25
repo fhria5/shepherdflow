@@ -2,22 +2,49 @@
  * Sermon-trace and verse validation — server-side, tolerant matching.
  */
 
-/** Lowercase, strip punctuation, collapse whitespace. */
+/**
+ * Lowercase, strip punctuation, collapse whitespace. Unicode-aware: keeps
+ * letters and digits from every script (Latin, Cyrillic, CJK, Hangul…),
+ * so quotes in Japanese, Chinese, Russian or Korean still match.
+ */
 export function normalizeText(s: string): string {
   return s
     .toLowerCase()
     .replace(/[“”"''`]/g, "'")
-    .replace(/[^a-z0-9\u00c0-\u024f\u1e00-\u1eff\s]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/** A quote is verified when its normalized form occurs in the transcript. */
+/**
+ * A quote is verified when its normalized form occurs in the transcript.
+ * Spaced text uses word-order matching; spaceless text (Japanese,
+ * Chinese) uses substring / ordered-character matching instead, since
+ * there are no word boundaries to split on.
+ */
 export function quoteExistsInTranscript(quote: string, transcript: string): boolean {
   const q = normalizeText(quote);
   const t = normalizeText(transcript);
-  if (!q || q.split(" ").length < 2) return false;
+  if (!q) return false;
   if (t.includes(q)) return true;
+  const spaceless = !q.includes(" ");
+  if (spaceless) {
+    const qChars = q.replace(/\s+/g, "");
+    const tChars = t.replace(/\s+/g, "");
+    if (qChars.length < 2) return false;
+    if (tChars.includes(qChars)) return true;
+    // Tolerant fallback: a long leading run of the quote appears in order.
+    if (qChars.length >= 8 && tChars.includes(qChars.slice(0, 12))) return true;
+    // Last resort: every character of the quote appears in order.
+    let pos = 0;
+    for (const ch of qChars) {
+      const idx = tChars.indexOf(ch, pos);
+      if (idx === -1) return false;
+      pos = idx + 1;
+    }
+    return true;
+  }
+  if (q.split(" ").length < 2) return false;
   // Tolerant fallback: every word of the quote appears in order with small gaps.
   const words = q.split(" ");
   let pos = 0;

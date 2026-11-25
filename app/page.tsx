@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { CareItem, Congregant, GenerateResult, OutputLang, Tone, Tradition, UiLang } from "@/lib/types";
+import type { Audience, CareItem, Congregant, GenerateResult, OutputLang, Tone, Tradition, UiLang } from "@/lib/types";
 import { SAMPLE_CONGREGANTS } from "@/lib/sample";
 import { getStrings } from "@/lib/i18n";
-import { downloadPdfFile, downloadTxtFile } from "@/lib/download";
+import { countUnits, isCharCountLang, maxUnits, minUnits } from "@/lib/languages";
+import { FontLoadError, downloadHandoutPdf, downloadPdfFile, downloadTxtFile } from "@/lib/download";
 import InputScreen from "@/app/components/InputScreen";
 import ResultsScreen from "@/app/components/ResultsScreen";
 import CareScreen from "@/app/components/CareScreen";
@@ -48,6 +49,7 @@ export default function Home() {
   const [tradition, setTradition] = useState<Tradition>("Protestant");
   const [tone, setTone] = useState<Tone>("warm");
   const [outputLang, setOutputLang] = useState<OutputLang>("en");
+  const [audience, setAudience] = useState<Audience>("adults");
   const [congregants, setCongregants] = useState<Congregant[]>(SAMPLE_CONGREGANTS);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [care, setCare] = useState<CareItem[]>([]);
@@ -55,21 +57,23 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadMsg, setDownloadMsg] = useState(false);
+  const [fontNotice, setFontNotice] = useState(false);
 
-  const wordCount = transcript.trim().split(/\s+/).filter(Boolean).length;
+  const charLang = isCharCountLang(outputLang);
+  const units = countUnits(transcript, outputLang);
 
   const generate = async () => {
     setError(null);
-    if (wordCount === 0) return setError(t.errorEmpty);
-    if (wordCount < 30) return setError(t.errorShort);
-    if (wordCount > 8000) return setError(t.errorLong);
+    if (units === 0) return setError(t.errorEmpty);
+    if (units < minUnits()) return setError(charLang ? t.errorShortChars : t.errorShort);
+    if (units > maxUnits(outputLang)) return setError(charLang ? t.errorLongChars : t.errorLong);
     const people = congregants.filter((c) => c.initials.trim().length > 0);
     setLoading(true);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript, tradition, tone, outputLang, congregants: people }),
+        body: JSON.stringify({ transcript, tradition, tone, outputLang, audience, congregants: people }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || t.errorApi);
@@ -87,16 +91,73 @@ export default function Home() {
 
   const currentResult = (): GenerateResult | null => (result ? { ...result, care } : null);
 
+  const downloadOpts = (sections: "sermon" | "care" | "all") => ({
+    uiLang,
+    sections,
+    aiNote,
+    outputLang,
+    audience,
+    transcriptTitle: sermonTitle(),
+  });
+
+  /** First short line of the transcript is the sermon title, if any. */
+  const sermonTitle = (): string | undefined => {
+    const first = transcript.split("\n").map((l) => l.trim()).find((l) => l.length > 0);
+    if (!first || first.length > 80) return undefined;
+    return first;
+  };
+
+  const showDownloaded = () => {
+    setDownloadMsg(true);
+    setTimeout(() => setDownloadMsg(false), 6000);
+  };
+
   const doDownload = async (format: "txt" | "pdf", sections: "sermon" | "care" | "all") => {
     const r = currentResult();
     if (!r) return;
-    const opts = { uiLang, sections, aiNote };
+    const opts = downloadOpts(sections);
     try {
       if (format === "txt") await downloadTxtFile(r, opts);
       else await downloadPdfFile(r, opts);
-      setDownloadMsg(true);
-      setTimeout(() => setDownloadMsg(false), 6000);
-    } catch {
+      showDownloaded();
+    } catch (e) {
+      // A PDF whose font could not be loaded falls back to .txt.
+      if (e instanceof FontLoadError && format === "pdf") {
+        try {
+          await downloadTxtFile(r, opts);
+          setFontNotice(true);
+          setTimeout(() => setFontNotice(false), 8000);
+          showDownloaded();
+          return;
+        } catch {
+          setError(t.errorApi);
+          return;
+        }
+      }
+      setError(t.errorApi);
+    }
+  };
+
+  const doHandout = async () => {
+    const r = currentResult();
+    if (!r) return;
+    const opts = downloadOpts("sermon");
+    try {
+      await downloadHandoutPdf(r, opts);
+      showDownloaded();
+    } catch (e) {
+      if (e instanceof FontLoadError) {
+        try {
+          await downloadTxtFile(r, opts);
+          setFontNotice(true);
+          setTimeout(() => setFontNotice(false), 8000);
+          showDownloaded();
+          return;
+        } catch {
+          setError(t.errorApi);
+          return;
+        }
+      }
       setError(t.errorApi);
     }
   };
@@ -191,6 +252,15 @@ export default function Home() {
         </div>
       )}
 
+      {fontNotice && (
+        <div role="status" className="card mt-4 flex items-center gap-2 p-3 font-sans text-sm text-bulletin-ink dark:text-bulletin-inkDark">
+          <span className="text-bulletin-olive dark:text-bulletin-oliveLight">
+            <InfoIcon />
+          </span>
+          {t.fontFallbackNote}
+        </div>
+      )}
+
       <main id="main-content" className="mt-6">
         {step === 1 && (
           <InputScreen
@@ -204,6 +274,8 @@ export default function Home() {
             setTone={setTone}
             outputLang={outputLang}
             setOutputLang={setOutputLang}
+            audience={audience}
+            setAudience={setAudience}
             congregants={congregants}
             setCongregants={setCongregants}
             onGenerate={generate}
@@ -220,6 +292,7 @@ export default function Home() {
               transcript={transcript}
               onDownloadTxt={() => doDownload("txt", "sermon")}
               onDownloadPdf={() => doDownload("pdf", "sermon")}
+              onDownloadHandout={doHandout}
             />
             <div className="mt-6 flex justify-between gap-2">
               <button type="button" onClick={() => setStep(1)} className="btn-ghost">
@@ -236,6 +309,7 @@ export default function Home() {
             <CareScreen
               t={t}
               uiLang={uiLang}
+              outputLang={outputLang}
               result={currentResult()!}
               care={care}
               setCare={setCare}

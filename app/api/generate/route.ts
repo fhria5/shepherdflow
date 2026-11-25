@@ -4,10 +4,13 @@ import {
   CareOutputSchema,
   GenerateOutputSchema,
   SermonOutputSchema,
+  type Audience,
   type Congregant,
   type GenerateRequest,
   type GenerateResult,
+  type OutputLang,
 } from "@/lib/types";
+import { OUTPUT_LANGUAGES, countUnits, isCharCountLang, maxUnits, minUnits } from "@/lib/languages";
 import { generateDemoResult } from "@/lib/sample";
 import { enforceTriage } from "@/lib/triage";
 import {
@@ -23,9 +26,10 @@ export const maxDuration = 60;
 
 const RequestSchema = z.object({
   transcript: z.string(),
-  tradition: z.enum(["Protestant", "Catholic", "Pentecostal/Charismatic", "Other"]),
+  tradition: z.enum(["Protestant", "Catholic", "Orthodox", "Pentecostal/Charismatic", "Evangelical", "Anglican/Lutheran", "Other"]),
   tone: z.enum(["formal", "warm", "simple"]),
-  outputLang: z.enum(["en", "id"]),
+  outputLang: z.enum(["en", "es", "pt", "fr", "ko", "id", "sw", "tl", "it", "ru", "ja", "zh"]),
+  audience: z.enum(["adults", "teens", "children"]).optional().default("adults"),
   congregants: z.array(
     z.object({
       id: z.string(),
@@ -36,28 +40,45 @@ const RequestSchema = z.object({
   ).max(30),
 });
 
-function countWords(s: string): number {
-  return s.trim().split(/\s+/).filter(Boolean).length;
+function audienceInstruction(audience: Audience): string {
+  if (audience === "teens")
+    return "AUDIENCE — teenagers (ages 13-17): use plain everyday words, short sentences, and relatable situations from school, home, friends, and phones. Do not use childish language.";
+  if (audience === "children")
+    return "AUDIENCE — children (ages 6-11): use very simple words, short sentences, and concrete examples from family, school, friends, and helping at home. Ask questions a child can answer from their own day.";
+  return "AUDIENCE — adults: use natural vocabulary and full sentences.";
+}
+
+function langName(lang: OutputLang): string {
+  return OUTPUT_LANGUAGES[lang].name;
 }
 
 function sermonSystemPrompt(req: GenerateRequest): string {
-  const lang = req.outputLang === "id" ? "Bahasa Indonesia" : "English";
+  const lang = langName(req.outputLang);
+  const info = OUTPUT_LANGUAGES[req.outputLang];
+  const quoteRule = isCharCountLang(req.outputLang)
+    ? "4. Every summary point and every discussion question MUST include a 'quote': a short passage copied VERBATIM from the transcript, at most about 100 characters."
+    : "4. Every summary point and every discussion question MUST include a 'quote': a short passage copied VERBATIM from the transcript, at most 25 words.";
   return [
     "You are ShepherdFlow, a sermon follow-up assistant for small churches.",
     "RULES — follow them strictly:",
-    "1. Use ONLY the sermon transcript provided. Do not add new teaching, interpretation, or Bible verses. Do not quote any verse that is not in the transcript.",
+    "1. Use ONLY the sermon transcript provided. Do not add new teaching, interpretation, or Bible verses. Do not quote any verse that is not in the transcript. Do not invent stories and present them as part of the sermon.",
     `2. Follow the ${req.tradition} tradition and a ${req.tone} tone. Do not judge other traditions.`,
     "3. Never give medical, legal, or psychological advice.",
-    "4. Every summary point and every discussion question MUST include a 'quote': a short passage copied VERBATIM from the transcript, at most 25 words.",
+    quoteRule,
     `5. Write ALL output text in ${lang}.`,
-    "6. Respond with JSON ONLY, matching this shape exactly:",
+    audienceInstruction(req.audience),
+    ...(info.beta
+      ? ["7. This language is in beta: write simply and clearly, so a native speaker can review it easily."]
+      : []),
+    "8. Respond with JSON ONLY, matching this shape exactly:",
     '{"summary":[{"text":"...","quote":"..."}], "questions":[{"text":"...","quote":"..."}], "devotions":[{"day":"Monday","text":"...","prayer":"..."}]}',
-    "summary: 3-4 points. questions: exactly 5. devotions: exactly 5, days Monday to Friday, written in the output language (e.g. Senin–Jumat for Bahasa Indonesia).",
+    `summary: 3-4 points. questions: exactly 5. devotions: exactly 5, days ${info.days.join(", ")}, written in the output language.`,
   ].join("\n");
 }
 
 function careSystemPrompt(req: GenerateRequest): string {
-  const lang = req.outputLang === "id" ? "Bahasa Indonesia" : "English";
+  const lang = langName(req.outputLang);
+  const info = OUTPUT_LANGUAGES[req.outputLang];
   return [
     "You are ShepherdFlow, a sermon follow-up assistant for small churches.",
     "RULES — follow them strictly:",
@@ -65,7 +86,11 @@ function careSystemPrompt(req: GenerateRequest): string {
     "2. Do not invent facts about any congregant. Drafts may only use what is in their category and note. Address a person by their initials only; never invent a name or a placeholder name.",
     "3. For care triage, suggest action 'message' or 'visit' and a short pastor suggestion. For people who are sick or grieving, or whose note mentions crisis, choose 'visit' and do NOT write a draft.",
     `4. Write ALL output text in ${lang}.`,
-    "5. Respond with JSON ONLY, matching this shape exactly:",
+    audienceInstruction(req.audience),
+    ...(info.beta
+      ? ["6. This language is in beta: write simply and clearly, so a native speaker can review it easily."]
+      : []),
+    "7. Respond with JSON ONLY, matching this shape exactly:",
     '{"care":[{"initials":"AK","action":"message","suggestion":"...","draft":"..."}]}',
     "care: one entry per congregant listed, in the same order.",
   ].join("\n");
@@ -75,7 +100,8 @@ function userText(req: GenerateRequest): string {
   return [
     `Tradition: ${req.tradition}`,
     `Tone: ${req.tone}`,
-    `Output language: ${req.outputLang === "id" ? "Bahasa Indonesia" : "English"}`,
+    `Output language: ${langName(req.outputLang)}`,
+    `Audience: ${req.audience}`,
     "",
     "SERMON TRANSCRIPT:",
     req.transcript,
@@ -87,9 +113,14 @@ function userText(req: GenerateRequest): string {
   ].join("\n");
 }
 
-function truncateQuote(quote: string, maxWords = 25): string {
-  const words = quote.trim().split(/\s+/);
-  if (words.length <= maxWords) return quote.trim();
+function truncateQuote(quote: string, lang: OutputLang, maxWords = 25): string {
+  const q = quote.trim();
+  // Spaceless scripts (Japanese, Chinese): cap by characters instead.
+  if (!q.includes(" ")) {
+    return q.length <= 120 ? q : q.slice(0, 120);
+  }
+  const words = q.split(/\s+/);
+  if (words.length <= maxWords) return q;
   return words.slice(0, maxWords).join(" ");
 }
 
@@ -100,12 +131,12 @@ function postProcess(
   const transcript = req.transcript;
 
   const summary = parsed.summary.map((s) => {
-    const q = truncateQuote(s.quote);
+    const q = truncateQuote(s.quote, req.outputLang);
     const verified = quoteExistsInTranscript(q, transcript);
     return { text: s.text, quote: q, quoteVerified: verified };
   });
   const questions = parsed.questions.map((q) => {
-    const quote = truncateQuote(q.quote);
+    const quote = truncateQuote(q.quote, req.outputLang);
     return { text: q.text, quote, quoteVerified: quoteExistsInTranscript(quote, transcript) };
   });
 
@@ -141,6 +172,8 @@ function postProcess(
     versesFlagged,
     demoMode: false,
     generatedAt: new Date().toISOString(),
+    outputLang: req.outputLang,
+    audience: req.audience,
   };
 }
 
@@ -156,19 +189,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request. Please check your input and try again." }, { status: 400 });
   }
   const req = parsedReq.data as GenerateRequest;
-  const words = countWords(req.transcript);
-  if (words === 0) {
+  const units = countUnits(req.transcript, req.outputLang);
+  const isChars = isCharCountLang(req.outputLang);
+  if (units === 0) {
     return NextResponse.json({ error: "empty", message: "Please paste a sermon transcript first." }, { status: 400 });
   }
-  if (words < 30) {
-    return NextResponse.json({ error: "too_short", message: "The transcript is too short. Please add more of the sermon (at least 30 words)." }, { status: 400 });
+  if (units < minUnits()) {
+    return NextResponse.json({ error: "too_short", message: isChars ? "The transcript is too short. Please add more of the sermon (at least 30 characters)." : "The transcript is too short. Please add more of the sermon (at least 30 words)." }, { status: 400 });
   }
-  if (words > 8000) {
-    return NextResponse.json({ error: "too_long", message: "The transcript is too long. The limit is 8,000 words." }, { status: 400 });
+  if (units > maxUnits(req.outputLang)) {
+    return NextResponse.json({ error: "too_long", message: isChars ? "The transcript is too long. The limit is 20,000 characters." : "The transcript is too long. The limit is 8,000 words." }, { status: 400 });
   }
   // DEMO MODE — no live AI key configured.
   if (!llmConfigured()) {
-    const demo = generateDemoResult(req.transcript, req.tone, req.outputLang, req.congregants);
+    const demo = generateDemoResult(req.transcript, req.tone, req.outputLang, req.audience, req.congregants);
     return NextResponse.json({ result: demo });
   }
 

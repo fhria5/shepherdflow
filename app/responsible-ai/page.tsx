@@ -46,6 +46,9 @@ export default function ResponsibleAiPage() {
           <p className="mt-2 text-bulletin-muted dark:text-bulletin-mutedDark">
             ShepherdFlow is built for small churches. It helps a pastor follow up a sermon — it never replaces the pastor.
           </p>
+          <p className="mt-2 text-bulletin-muted dark:text-bulletin-mutedDark">
+            Built for small churches everywhere, with limited staff and limited time.
+          </p>
           <div className="mt-4 border-t-2 border-bulletin-gold" aria-hidden="true" />
         </header>
         <section aria-label="Five principles" className="mt-6 space-y-4">

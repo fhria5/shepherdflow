@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import type { CareItem, GenerateResult, UiLang } from "@/lib/types";
+import type { CareItem, GenerateResult, OutputLang, UiLang } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
+import { formatCopy, type CopyFormat } from "@/lib/copyFormats";
 import type { Strings } from "@/lib/i18n";
 
 interface Props {
   t: Strings;
   uiLang: UiLang;
+  outputLang: OutputLang;
   result: GenerateResult;
   care: CareItem[];
   setCare: (v: CareItem[]) => void;
@@ -76,25 +78,76 @@ export default function CareScreen(p: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyFormat, setCopyFormat] = useState<CopyFormat>("text");
+  const [copyAiNote, setCopyAiNote] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<Record<string, string>>({});
 
   const update = (initials: string, patch: Partial<CareItem>) => {
     p.setCare(p.care.map((c) => (c.initials === initials ? { ...c, ...patch } : c)));
   };
 
-  const copyDraft = async (c: CareItem) => {
-    if (!c.draft) return;
+  /** One copy path for sighted and screen-reader users: the Async
+   *  Clipboard API first, execCommand as a last resort, and the result
+   *  announced in a role="status" region outside the button. */
+  const writeToClipboard = async (text: string): Promise<boolean> => {
     try {
-      await navigator.clipboard.writeText(c.draft);
+      await navigator.clipboard.writeText(text);
+      return true;
     } catch {
+      const previousFocus = document.activeElement as HTMLElement | null;
       const ta = document.createElement("textarea");
-      ta.value = c.draft;
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;opacity:0";
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand("copy");
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch {
+        ok = false;
+      }
       ta.remove();
+      previousFocus?.focus({ preventScroll: true });
+      return ok;
     }
-    setCopiedId(c.initials);
-    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const announceCopy = (initials: string, ok: boolean) => {
+    const message = ok ? p.t.copied : p.t.copyFailed;
+    setCopyStatus((s) => ({ ...s, [initials]: message }));
+    setTimeout(() => {
+      setCopyStatus((s) => {
+        const next = { ...s };
+        delete next[initials];
+        return next;
+      });
+    }, 3000);
+  };
+
+  const copyDraft = async (c: CareItem) => {
+    if (!c.draft) return;
+    const ok = await writeToClipboard(c.draft);
+    announceCopy(c.initials, ok);
+    if (ok) {
+      setCopiedId(c.initials);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
+
+  /** Copy an approved or edited draft in the chosen ready-to-send
+   *  format. Only ever offered for "Send a message" people — visit
+   *  cases have no draft and no copy options. */
+  const copyAsFormat = async (c: CareItem) => {
+    if (!c.draft) return;
+    const text = formatCopy(
+      c.draft,
+      copyFormat,
+      p.outputLang,
+      copyFormat === "email" && copyAiNote
+    );
+    const ok = await writeToClipboard(text);
+    announceCopy(c.initials, ok);
   };
 
   const personLabel = (verb: "approve" | "edit" | "copy", initials: string) => {
@@ -263,7 +316,59 @@ export default function CareScreen(p: Props) {
                           <span className="border-b border-dashed border-bulletin-muted dark:border-bulletin-mutedDark">{p.t.notApproved}</span>
                         </span>
                       )}
+                      <span
+                        role="status"
+                        className="inline-flex min-h-[2rem] items-center font-sans text-xs font-semibold text-bulletin-olive dark:text-bulletin-oliveLight"
+                      >
+                        {copyStatus[c.initials] || ""}
+                      </span>
                     </div>
+                    {(c.draftApproved || c.draftEdited) && (
+                      <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-bulletin-line pt-3 dark:border-bulletin-lineDark">
+                        <div>
+                          <label htmlFor={`copyas-${c.initials}`} className="field-label">
+                            {p.t.copyAs}
+                          </label>
+                          <select
+                            id={`copyas-${c.initials}`}
+                            value={copyFormat}
+                            onChange={(e) => setCopyFormat(e.target.value as CopyFormat)}
+                            className="field w-auto"
+                          >
+                            <option value="text">{p.t.copyText}</option>
+                            <option value="whatsapp">{p.t.copyWhatsApp}</option>
+                            <option value="email">{p.t.copyEmail}</option>
+                          </select>
+                        </div>
+                        {copyFormat === "email" && (
+                          <label className="flex min-h-[2.75rem] cursor-pointer items-center gap-2 font-sans text-sm">
+                            <input
+                              type="checkbox"
+                              checked={copyAiNote}
+                              onChange={(e) => setCopyAiNote(e.target.checked)}
+                              className="h-5 w-5 shrink-0 accent-[#3f5b3a] dark:accent-[#a9c79f]"
+                            />
+                            <span>{p.t.addAiNoteEmail}</span>
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => copyAsFormat(c)}
+                          aria-label={
+                            p.uiLang === "id"
+                              ? `Salin pesan untuk ${c.initials} sebagai ${
+                                  copyFormat === "text" ? p.t.copyText : copyFormat === "whatsapp" ? p.t.copyWhatsApp : p.t.copyEmail
+                                }`
+                              : `Copy message for ${c.initials} as ${
+                                  copyFormat === "text" ? p.t.copyText : copyFormat === "whatsapp" ? p.t.copyWhatsApp : p.t.copyEmail
+                                }`
+                          }
+                          className="btn-small bg-bulletin-olive text-white hover:bg-bulletin-oliveDeep dark:bg-bulletin-oliveLight dark:text-bulletin-bgDark dark:hover:bg-[#bcd8b2]"
+                        >
+                          {p.t.copy}
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

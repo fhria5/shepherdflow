@@ -12,11 +12,12 @@ interface Props {
   transcript: string;
   onDownloadTxt: () => void;
   onDownloadPdf: () => void;
+  onDownloadHandout: () => void;
 }
 
 function sentenceList(text: string): string[] {
   return text
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[.!?。！？])\s*/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
@@ -98,7 +99,7 @@ function SourceButton({ quote, verified, viewSourceLabel, sourceText, sourceUnve
   );
 }
 
-export default function ResultsScreen({ t, uiLang, result, transcript, onDownloadTxt, onDownloadPdf }: Props) {
+export default function ResultsScreen({ t, uiLang, result, transcript, onDownloadTxt, onDownloadPdf, onDownloadHandout }: Props) {
   const [activeQuote, setActiveQuote] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dragY, setDragY] = useState(0);
@@ -193,6 +194,19 @@ export default function ResultsScreen({ t, uiLang, result, transcript, onDownloa
     uiLang === "id"
       ? "Kutipan ini belum cocok dengan transkrip. Periksa sebelum dipakai."
       : "This quote does not match the transcript yet. Check before using it.";
+  const audienceName =
+    uiLang === "id"
+      ? result.audience === "teens"
+        ? "Remaja"
+        : result.audience === "children"
+          ? "Anak-anak (usia 6-11)"
+          : "Dewasa"
+      : result.audience === "teens"
+        ? "Teens"
+        : result.audience === "children"
+          ? "Children (ages 6-11)"
+          : "Adults";
+  const isBeta = ["ru", "ja", "zh"].includes(result.outputLang);
 
   const sourceButtonProps = (quote: string, verified: boolean): SourceButtonProps => ({
     quote,
@@ -219,6 +233,12 @@ export default function ResultsScreen({ t, uiLang, result, transcript, onDownloa
         </span>
         {t.aiDraftLabel}
       </p>
+      <p className="font-sans text-sm text-bulletin-muted dark:text-bulletin-mutedDark">
+        {t.writtenFor}: {audienceName}
+      </p>
+      {isBeta && (
+        <p className="font-sans text-sm text-bulletin-muted dark:text-bulletin-mutedDark">{t.betaNote}</p>
+      )}
 
       <section aria-labelledby="summary-heading">
         <h2 id="summary-heading" className="font-serif text-2xl font-semibold">
@@ -364,6 +384,10 @@ export default function ResultsScreen({ t, uiLang, result, transcript, onDownloa
           <button type="button" onClick={onDownloadPdf} className="btn-secondary flex-1">
             <DownloadIcon />
             {t.downloadPdf}
+          </button>
+          <button type="button" onClick={onDownloadHandout} className="btn-ghost w-full">
+            <DownloadIcon />
+            {t.handout}
           </button>
         </div>
       </div>

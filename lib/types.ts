@@ -1,9 +1,29 @@
 import { z } from "zod";
 
-export type Tradition = "Protestant" | "Catholic" | "Pentecostal/Charismatic" | "Other";
+export type Tradition =
+  | "Protestant"
+  | "Catholic"
+  | "Orthodox"
+  | "Pentecostal/Charismatic"
+  | "Evangelical"
+  | "Anglican/Lutheran"
+  | "Other";
 export type Tone = "formal" | "warm" | "simple";
-export type OutputLang = "en" | "id";
+export type OutputLang =
+  | "en"
+  | "es"
+  | "pt"
+  | "fr"
+  | "ko"
+  | "id"
+  | "sw"
+  | "tl"
+  | "it"
+  | "ru"
+  | "ja"
+  | "zh";
 export type UiLang = "en" | "id";
+export type Audience = "adults" | "teens" | "children";
 export type Category =
   | "new"
   | "absent"
@@ -24,6 +44,7 @@ export interface GenerateRequest {
   tradition: Tradition;
   tone: Tone;
   outputLang: OutputLang;
+  audience: Audience;
   congregants: Congregant[];
 }
 
@@ -99,6 +120,8 @@ export interface GenerateResult {
   versesFlagged: string[];
   demoMode: boolean;
   generatedAt: string;
+  outputLang: OutputLang;
+  audience: Audience;
 }
 
 export const CATEGORY_LABELS: Record<Category, { en: string; id: string }> = {
